@@ -38,16 +38,13 @@ robotics-rl-study/
 
 ## 학습 자료
 
-- K-MOOC 한양대학교 「강화학습」 강의 (개념 정리는 직접 이해한 내용으로 작성)
+- K-MOOC 한양대학교 「강화학습」 강의 
 - Isaac Lab 공식 문서
 - Stable-Baselines3 소스 코드
 
 ## 주요 정리 및 트러블슈팅
 
 공부하면서 막혔던 부분과 해결 과정을 기록합니다.
-
-- (예시) RTX 50 시리즈에서 PyTorch CUDA 버전 호환 문제 → 해결 방법
-- (예시) SB3의 `batch_size`와 RSL-RL의 `num_mini_batches` 차이
 
 ## 배운 점
 
