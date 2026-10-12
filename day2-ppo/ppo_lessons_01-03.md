@@ -1,0 +1,392 @@
+# PPO 공부 노트 1~3강: 강화학습 기초부터 경험 수집까지
+
+> 대상: 강화학습·PyTorch를 처음 공부하는 학습자  
+> 목표: PPO 코드를 봤을 때 `Actor`, `Critic`, `Categorical`, `RolloutBuffer`가 무슨 일을 하는지 말로 설명할 수 있다.
+
+## 이 노트를 공부하는 방법
+
+1. 먼저 **개념** 부분만 읽는다.
+2. 코드를 한 줄씩 읽되, 모든 기호를 외우려 하지 말고 각 줄이 받는 입력과 만드는 출력을 확인한다.
+3. 코드를 가리고 `이 코드는 왜 필요한가?`를 말로 설명한다.
+4. 마지막 복습 문제를 풀고, 답은 맨 아래에서 확인한다.
+
+---
+
+# 1강. 강화학습과 PPO의 큰 그림
+
+## 1. 강화학습은 무엇을 학습하는가?
+
+강화학습(Reinforcement Learning, RL)은 **환경과 상호작용하면서 누적 보상을 높이는 행동 방법을 학습하는 방식**이다.
+
+CartPole 예제를 생각해 보자. 막대가 쓰러지지 않도록 카트를 왼쪽 또는 오른쪽으로 움직이는 것이 목표다.
+
+| 용어 | 쉬운 의미 | CartPole 예시 |
+|---|---|---|
+| 환경(Environment) | 행동의 결과를 돌려주는 세계 | CartPole 시뮬레이터 |
+| 상태(State, `obs`) | 현재 상황을 설명하는 숫자 | 카트 위치·속도, 막대 각도·각속도 |
+| 행동(Action, `action`) | 에이전트가 선택하는 동작 | 왼쪽 또는 오른쪽 |
+| 보상(Reward, `reward`) | 행동 후 환경이 돌려주는 점수 | 막대가 유지된 시간 동안 보상 획득 |
+| 정책(Policy, `π`) | 상태를 보고 행동을 고르는 규칙 | 현재 상태에서 왼쪽/오른쪽을 고를 확률 |
+| 에이전트(Agent) | 행동을 선택하고 학습하는 주체 | PPO 모델 |
+
+강화학습의 기본 반복은 다음과 같다.
+
+```python
+obs, info = env.reset()  # 환경을 시작하고 첫 상태를 받는다.
+
+while True:
+    action = policy(obs)  # 현재 상태를 보고 행동을 고른다.
+    next_obs, reward, terminated, truncated, info = env.step(action)
+
+    # 여기서 경험을 기록하고, 필요하면 모델을 학습한다.
+    obs = next_obs
+
+    if terminated or truncated:
+        break
+```
+
+이 코드는 강화학습의 **개념을 보여주는 간단한 예시**다. 실제 PPO 코드는 학습 데이터를 모으고, Advantage를 계산하고, 여러 번 업데이트하는 과정이 추가된다.
+
+### `terminated`와 `truncated`는 왜 따로 있을까?
+
+- `terminated`: 환경의 과제 정의상 에피소드가 끝났다. 예를 들어 막대가 허용 각도를 벗어났다.
+- `truncated`: 시간 제한 등 환경 바깥의 제한 때문에 에피소드가 끝났다.
+
+둘을 무조건 똑같이 처리하면 Critic의 다음 상태 가치 예측을 활용해야 하는 상황을 잘못 처리할 수 있다. 4강에서 다시 다룬다.
+
+## 2. PPO는 무엇인가?
+
+PPO는 **Proximal Policy Optimization**의 약자다. 정책을 개선하되 한 번의 업데이트로 정책이 지나치게 크게 바뀌는 것을 억제하도록 설계된 정책 최적화 알고리즘이다.
+
+초보자 관점에서는 다음 세 문장으로 기억한다.
+
+1. **Actor**는 어떤 행동을 할지 결정한다.
+2. **Critic**은 현재 상태에서 앞으로 얻을 보상을 추정한다.
+3. **PPO의 Clipping**은 정책 업데이트의 목적함수에서 과도한 정책 변화가 주는 이득을 제한한다.
+
+Clipping이 모델의 실제 확률을 무조건 특정 범위 안에 고정하는 것은 아니다. 목적함수에 사용하는 확률 비율의 영향을 제한하는 장치다. 6강에서 자세히 다룬다.
+
+## 3. PPO가 한 번 학습할 때의 흐름
+
+```text
+Actor / Critic 초기화
+        ↓
+현재 정책으로 환경과 상호작용하며 경험 수집
+        ↓
+경험을 RolloutBuffer에 저장
+        ↓
+Return과 Advantage 계산
+        ↓
+경험을 미니배치로 나눔
+        ↓
+Actor의 Policy Loss + Critic의 Value Loss 계산
+        ↓
+역전파(backpropagation)와 optimizer 업데이트
+        ↓
+다음 경험 수집 및 반복
+```
+
+**Rollout**은 현재 정책으로 일정량의 경험을 모은 묶음이라고 생각하면 된다.
+
+## 4. 자주 보는 하이퍼파라미터
+
+네가 공부한 CartPole PPO 코드의 설정은 다음과 같은 형태다.
+
+```python
+env_name = "CartPole-v1"
+total_timesteps = 100_000
+n_steps = 2048
+batch_size = 64
+n_epochs = 10
+
+gamma = 0.99
+gae_lambda = 0.95
+clip_range = 0.2
+learning_rate = 3e-4
+vf_coef = 0.5
+ent_coef = 0.0
+max_grad_norm = 0.5
+```
+
+| 변수 | 의미 | 현재 값 해석 |
+|---|---|---|
+| `total_timesteps` | 전체 학습에서 환경과 상호작용할 목표 스텝 수 | 100,000 스텝 |
+| `n_steps` | 한 Rollout에서 모을 스텝 수 | 2,048개 |
+| `batch_size` | 한 번에 학습할 경험 수 | 64개 |
+| `n_epochs` | 같은 Rollout 데이터를 반복 학습할 횟수 | 10회 |
+| `gamma` | 미래 보상을 현재 가치로 얼마나 반영할지 정하는 할인율 | 0.99 |
+| `gae_lambda` | GAE에서 TD 오차를 누적하는 정도를 조절 | 0.95 |
+| `clip_range` | PPO 목적함수에서 Ratio를 제한하는 범위 | 0.2 → 보통 0.8~1.2 |
+| `learning_rate` | 옵티마이저의 업데이트 크기를 조절하는 설정 | 0.0003 |
+| `vf_coef` | Critic 손실이 전체 손실에 반영되는 비중 | 0.5 |
+| `ent_coef` | 엔트로피 항이 전체 손실에 반영되는 비중 | 0.0이면 엔트로피 항 영향 없음 |
+| `max_grad_norm` | Gradient Clipping의 최대 노름 | 0.5 |
+
+하이퍼파라미터는 각각 다른 역할을 한다. 예를 들어 `clip_range`는 PPO 목적함수의 제한과 관련되고, `max_grad_norm`은 역전파 후 계산된 gradient의 크기 제한과 관련된다. 둘은 같은 설정이 아니다.
+
+---
+
+# 2강. Actor와 Critic 네트워크 이해하기
+
+## 1. 신경망의 뼈대
+
+네 모델은 Actor와 Critic이 별도 MLP(Multi-Layer Perceptron)를 갖는 구조다. MLP는 여러 `Linear` 층과 비선형 활성화 함수를 연결한 신경망이다.
+
+```python
+import torch
+import torch.nn as nn
+from torch.distributions import Categorical
+
+class ActorCritic(nn.Module):
+    def __init__(self, obs_dim, n_actions):
+        super().__init__()
+
+        self.actor = nn.Sequential(
+            nn.Linear(obs_dim, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
+            nn.Linear(64, n_actions),
+        )
+
+        self.critic = nn.Sequential(
+            nn.Linear(obs_dim, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
+            nn.Linear(64, 1),
+        )
+
+    def get_dist(self, obs):
+        logits = self.actor(obs)
+        return Categorical(logits=logits)
+
+    def get_value(self, obs):
+        return self.critic(obs).squeeze(-1)
+```
+
+이 코드는 수업에서 다룬 구조를 이해하기 위한 핵심 부분이다. `obs_dim`과 `n_actions`는 환경에서 가져온 차원을 사용한다.
+
+### `nn.Linear(in_features, out_features)`
+
+`Linear` 층은 입력 숫자들을 학습 가능한 가중치와 편향을 사용해 새 숫자들로 변환한다.
+
+```python
+nn.Linear(4, 64)   # 숫자 4개를 받아 숫자 64개를 만든다.
+nn.Linear(64, 2)  # 숫자 64개를 받아 숫자 2개를 만든다.
+```
+
+CartPole에서는 상태 관측값이 4개이고 행동이 2개이므로, Actor의 마지막 층은 2개 숫자를 출력한다. Critic의 마지막 층은 상태 가치 하나를 출력한다.
+
+### `nn.Tanh()`
+
+`Tanh`는 비선형 활성화 함수다. 여러 Linear 층을 단순히 연결한 것만으로는 표현할 수 있는 함수에 제약이 있다. 중간에 비선형 함수를 넣으면 더 복잡한 관계를 학습할 수 있다.
+
+## 2. 파라미터화(parameterization)는 무엇인가?
+
+정책을 신경망으로 표현한다는 것은 정책을 구성하는 규칙을 **학습 가능한 숫자들(가중치와 편향)**로 나타낸다는 뜻이다.
+
+- 모델의 파라미터가 바뀐다.
+- 같은 상태를 입력해도 Actor의 출력이 달라질 수 있다.
+- 그 결과 각 행동의 선택 확률도 바뀔 수 있다.
+
+즉, 정책은 고정된 규칙이 아니라 학습 가능한 파라미터 `θ`에 의해 결정된다. 보통 Actor의 파라미터를 `θ`, Critic의 파라미터를 `ω`로 표기한다.
+
+## 3. Actor 출력은 확률 그 자체가 아니라 Logits
+
+```python
+logits = self.actor(obs)
+dist = Categorical(logits=logits)
+```
+
+Actor가 `[1.2, 0.2]`를 출력했다고 가정하자. 이 두 값은 **logits**이며, 직접 확률이라고 읽으면 안 된다. `Categorical(logits=...)`가 이를 행동 확률 분포로 변환한다.
+
+대략적인 확률은 다음과 같다.
+
+- 행동 0: 약 73.1%
+- 행동 1: 약 26.9%
+
+`logits`를 입력으로 사용하는 방식은 내부에서 정규화된 확률 분포를 다룰 수 있게 해 준다.
+
+## 4. 행동 선택과 로그 확률
+
+```python
+dist = model.get_dist(obs)
+action = dist.sample()
+log_prob = dist.log_prob(action)
+```
+
+| 코드 | 뜻 |
+|---|---|
+| `dist.sample()` | 분포에서 행동 하나를 샘플링한다. |
+| `dist.log_prob(action)` | 선택한 행동에 해당하는 로그 확률을 구한다. |
+
+**샘플링은 그 자체로 학습이 아니다.** 샘플링은 행동을 선택하는 단계이고, 파라미터는 나중에 손실을 계산하고 옵티마이저를 실행할 때 업데이트된다.
+
+로그 확률을 저장하는 이유는 나중에 같은 상태·행동에 대해 현재 정책이 부여하는 로그 확률과 비교하기 위해서다. 이 비교로 PPO의 Ratio를 계산한다(6강).
+
+## 5. Critic은 무엇을 출력하는가?
+
+```python
+def get_value(self, obs):
+    return self.critic(obs).squeeze(-1)
+```
+
+Critic은 `V(s)`라는 상태 가치 추정값을 출력한다. 이는 **현재 상태에서 앞으로 얻을 할인 누적 보상의 추정치**다.
+
+예를 들어 Critic이 `5.0`을 출력했다고 해서 환경이 실제로 보상 5를 줬다는 뜻은 아니다. 실제 보상은 환경이 `env.step()`에서 돌려주는 `reward`이고, Critic의 출력은 모델의 예측이다.
+
+### `.squeeze(-1)`는 무슨 의미인가?
+
+Critic의 마지막 층은 보통 각 상태에 대해 길이 1인 마지막 차원을 가진다.
+
+```text
+배치 입력:       (64, 4)
+Critic 원 출력:  (64, 1)
+squeeze(-1) 후:  (64,)
+```
+
+마지막 크기 1 차원을 제거해 배치당 상태 가치 하나를 나타내기 편하게 한다. 배치 크기 자체를 없애는 연산은 아니다.
+
+## 6. `torch.no_grad()`
+
+```python
+with torch.no_grad():
+    dist = model.get_dist(obs)
+    action = dist.sample()
+    log_prob = dist.log_prob(action)
+    value = model.get_value(obs)
+```
+
+이 블록은 해당 계산에 대해 자동 미분용 계산 기록을 만들지 않게 한다. 경험 수집 단계에서는 행동과 예측값을 얻어 저장하는 것이 목적이므로 일반적으로 gradient가 필요하지 않다.
+
+나중에 학습 미니배치에서 손실을 계산할 때는 gradient가 필요하므로 보통 `torch.no_grad()` 밖에서 계산한다.
+
+---
+
+# 3강. RolloutBuffer와 경험 수집
+
+## 1. 무엇을 버퍼에 저장하는가?
+
+환경에서 한 번 상호작용해 얻는 경험은 기본적으로 다음과 같다.
+
+`(state, action, reward, next_state, done)`
+
+PPO 학습에서는 여기에 추가 정보도 저장한다.
+
+| 저장 항목 | 나중에 쓰는 이유 |
+|---|---|
+| `obs` | 학습 미니배치의 입력 상태 |
+| `actions` | 당시 선택된 행동 |
+| `rewards` | Return/Advantage 계산 |
+| `dones` | 에피소드 경계와 부트스트랩 여부 판단 |
+| `values` | 경험 수집 시점 Critic의 상태 가치 예측 |
+| `log_probs` | 경험 수집 시점 정책의 로그 확률; 이후 Ratio 계산 |
+| `advantages` | Actor의 업데이트 방향 및 강도 계산 |
+| `returns` | Critic이 맞추도록 할 목표값 |
+
+`advantages`와 `returns`는 보통 처음 경험을 저장할 때 완성되어 있는 값이 아니다. 먼저 상태·행동·보상·가치 등의 경험을 모은 다음, Rollout이 끝나면 계산한다.
+
+## 2. 경험 수집 코드의 흐름
+
+아래는 핵심 동작을 줄여서 나타낸 학습용 예시다.
+
+```python
+for step in range(n_steps):
+    with torch.no_grad():
+        dist = model.get_dist(obs)
+        action = dist.sample()
+        log_prob = dist.log_prob(action)
+        value = model.get_value(obs)
+
+    next_obs, reward, terminated, truncated, info = env.step(
+        action.item()
+    )
+
+    done = terminated or truncated
+
+    buffer.add(
+        obs=obs,
+        action=action,
+        reward=reward,
+        done=done,
+        value=value,
+        log_prob=log_prob,
+    )
+
+    obs = next_obs
+    if done:
+        obs, info = env.reset()
+```
+
+실제 코드에서는 버퍼 자료형, 보상 텐서 변환, 에피소드 점수 기록, 마지막 상태 가치 계산 등이 더 필요할 수 있다. 특히 `truncated` 처리 방식은 4강의 주의 사항을 확인한다.
+
+## 3. 왜 `n_steps=2048`과 `batch_size=64`를 따로 둘까?
+
+- `n_steps=2048`: 한 번의 Rollout에서 경험 2,048개를 수집한다.
+- `batch_size=64`: 최적화할 때 경험을 64개씩 나눠 사용한다.
+
+따라서 한 epoch의 미니배치 수는 다음과 같다.
+
+`2048 ÷ 64 = 32개 미니배치`
+
+`n_epochs=10`이면 동일 Rollout을 총 `32 × 10 = 320`개의 미니배치 업데이트에 사용한다.
+
+여기서 **수집한 경험의 수(2,048)**와 **업데이트 횟수(320)**는 다른 개념이다.
+
+## 4. 미니배치 추출
+
+버퍼의 `get(batch_size)`는 인덱스를 섞은 다음 일정한 크기로 나누어 주는 형태다.
+
+```python
+indices = np.random.permutation(n_steps)
+
+for start in range(0, n_steps, batch_size):
+    batch_indices = indices[start : start + batch_size]
+    yield batch_indices
+```
+
+- `np.random.permutation(n_steps)`: `0`부터 `n_steps-1`까지의 인덱스를 무작위 순서로 섞는다.
+- `start:start + batch_size`: 그중 미니배치 하나의 인덱스를 가져온다.
+- `yield`: 한 번에 전체 미니배치를 모두 반환하지 않고, 반복문이 진행될 때마다 하나씩 전달한다.
+
+이 코드는 개념을 보여주는 간략한 예시다. 실제 버퍼에서는 인덱스를 사용해 `obs`, `actions`, `advantages` 등 각 배열에서 같은 위치의 데이터를 가져와야 한다.
+
+## 5. 지금 꼭 구분할 세 가지 값
+
+| 값 | 어디서 오는가? | 뜻 |
+|---|---|---|
+| `reward` | 환경 `env.step()` | 환경이 실제로 준 즉시 보상 |
+| `value` | Critic 신경망 | 현재 상태의 예상 미래 보상 |
+| `return` | 보상과 미래 가치 정보로 계산 | Critic이 학습할 목표값 |
+
+셋은 서로 대체할 수 없다. Critic의 예측값이 틀릴 수 있기 때문에 학습할 목표값 `return`과 비교해 오차를 계산한다(5강).
+
+---
+
+# 1~3강 셀프 체크
+
+1. Actor와 Critic의 역할을 각각 한 문장으로 설명해 보라.
+2. Actor가 출력한 logits와 행동 확률은 같은 것인가?
+3. `dist.sample()`이 실행되면 신경망 가중치가 즉시 업데이트되는가?
+4. `old_log_prob`를 경험 수집 시점에 저장하는 이유는 무엇인가?
+5. `n_steps=2048`, `batch_size=64`, `n_epochs=10`이면 Rollout당 미니배치 업데이트는 몇 번인가?
+6. `reward`, `value`, `return`은 어떻게 다른가?
+
+<details>
+<summary>정답과 해설 보기</summary>
+
+1. Actor는 상태에서 행동 분포를 만들고, Critic은 상태의 미래 누적 보상을 추정한다.
+2. 아니다. Logits는 분포를 만드는 점수이며 `Categorical(logits=...)`가 행동 분포를 구성한다.
+3. 아니다. 샘플링은 행동 선택일 뿐이다. 학습 업데이트는 손실 계산, 역전파, 옵티마이저 단계에서 일어난다.
+4. 이후 현재 정책의 로그 확률과 비교해 PPO Ratio를 계산하기 위해서다.
+5. `2048 / 64 = 32`개 미니배치, `32 × 10 = 320`회 업데이트다.
+6. Reward는 환경이 준 즉시 보상, Value는 Critic의 예측, Return은 Critic이 맞추도록 계산하는 목표값이다.
+
+</details>
+
+## 다음 강의에서 이어질 내용
+
+- 4강: Return, TD Error, Advantage, GAE, 종료 처리
+- 5강: Value Loss, 전체 Loss, 역전파와 옵티마이저
+
