@@ -13,9 +13,11 @@
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | Day 1 | RL 기초: MDP, 가치 함수, MC/TD, On/Off-policy | 🔄 진행 중 |
-| Day 2 | REINFORCE → A2C → PPO, SB3로 LunarLander 학습 | ⬜ 예정 |
-| Day 3 | Isaac Lab Cartpole로 PPO 하이퍼파라미터 실험 | ⬜ 예정 |
-| Day 4~6 | 휴머노이드(G1) 보행 학습 및 보상 실험 → [별도 저장소](링크) | ⬜ 예정 |
+| Day 2 | PPO 원리(GAE, Ratio Clipping) 정리, 직접 구현한 PPO로 CartPole-v1 학습·디버깅·하이퍼파라미터 실험 | 🔄 진행 중 |
+| Day 3 | Isaac Lab Cartpole로 PPO 하이퍼파라미터 실험 | 🔄 진행 중 |
+| Day 4 | G1 보상 구조 읽기, 기본 보행 학습 영상 남기기 | 🔄 진행 중 |
+| Day 5 | 보상 실험 가설 세우기, 실험 1(`feet_air_time` 끄기) 결과 읽기 | ⬜ 예정 |
+| Day 6 | 기본 vs 실험 1 비교·해석, 포트폴리오 정리 | ⬜ 예정 |
 | 이후 | Sim-to-sim(MuJoCo), SO-101 로봇팔 sim-to-real | ⬜ 예정 |
 
 > 상태 표시: ✅ 완료 / 🔄 진행 중 / ⬜ 예정
@@ -24,9 +26,12 @@
 
 ```
 robotics-rl-study/
-├── day1-rl-basics/          # RL 기초 개념 정리, 셀프 체크
-├── day2-ppo/                # 정책 경사 ~ PPO 정리, LunarLander 실습 코드
-└── day3-isaaclab-cartpole/  # RSL-RL PPO 설정 분석, 하이퍼파라미터 실험
+├── day1-rl-basics/              # RL 기초 개념 정리, 셀프 체크
+├── day2-ppo/                    # PPO 1~9강 정리, 직접 구현한 PPO(my_ppo.py)
+├── day3-isaaclab-cartpole/      # RSL-RL PPO 설정 분석, 하이퍼파라미터 실험
+├── day4-g1-reward-baseline/     # G1 보상 구조 정리, 기본 학습 영상
+├── day5-g1-reward-experiment/   # 보상 실험 가설 및 결과
+└── day6-g1-analysis-portfolio/  # 실험 비교·해석, 최종 정리
 ```
 
 ## 실습 환경
