@@ -149,7 +149,7 @@ joint_effort = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["slider
 
 RSL-RL 소스: `~/miniforge3/envs/isaaclab/lib/python3.11/site-packages/rsl_rl/` (v3.1.2)
 
-PPO의 뼈대는 같다. 2일차에 배운 개념이 RSL-RL 코드에서 어디에 있는지 찾아봤다.
+PPO의 뼈대는 같다. 1·2일차에 배운 개념이 RSL-RL 코드에서 어디에 있는지 찾아봤다.
 
 ### 5.1 GAE — 거의 똑같다
 
@@ -169,7 +169,7 @@ last_gae = delta + gamma * gae_lambda * next_non_terminal * last_gae
 self.returns = self.advantages + self.values
 ```
 
-→ 4·5강에서 배운 `TD error → GAE → Return = Advantage + Value` 그대로.
+→ [2일차 4·5강](../day2-ppo/PPO_04-05강_Advantage_GAE와_손실함수.md)에서 배운 `TD error → GAE → Return = Advantage + Value` 그대로.
 
 ### 5.2 Advantage 정규화 — 하는 시점이 다르다
 
@@ -238,7 +238,7 @@ elif kl_mean < self.desired_kl / 2.0 and kl_mean > 0.0:
 - **미니배치마다** 검사한다
 - 학습률 그래프가 1e-2와 1e-5 사이에서 계단처럼 움직인 이유가 이것
 - 9강에서는 `learning_rate`를 손으로 바꿔가며 실험했는데, RSL-RL은 KL을 보고 자동으로 조절한다
-  (6·7강의 "기존 정책과 현재 정책이 너무 달라지면 안 된다"를 clip 말고 학습률로도 막는 것)
+  ([2일차 6·7강](../day2-ppo/PPO_06-07강_Ratio_Clipping과_전체학습루프.md)의 "기존 정책과 현재 정책이 너무 달라지면 안 된다"를 clip 말고 학습률로도 막는 것)
 
 ---
 

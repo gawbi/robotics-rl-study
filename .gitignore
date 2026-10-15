@@ -1,0 +1,17 @@
+# 학습 로그와 체크포인트 (원본은 ~/IsaacLab/logs 에 보관)
+logs/
+events.out.tfevents*
+*.pt
+*.pth
+*.onnx
+
+# 원본 영상 (GIF로 변환한 것만 올림)
+*.mp4
+
+# Python
+__pycache__/
+*.pyc
+
+# 기타
+*.log
+.DS_Store
