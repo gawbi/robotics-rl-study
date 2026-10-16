@@ -7,7 +7,7 @@
 1. 4강에서 **Critic의 예측, Advantage, Return**의 차이를 확실히 구분한다.
 2. GAE 수식과 역순 반복문을 연결한다.
 3. 5강에서 손실이 만들어지고 파라미터 업데이트로 이어지는 순서를 익힌다.
-4. 마지막 문제를 풀고 답을 확인한다.
+4. 마지막 `확인한 점`으로 핵심을 정리한다.
 
 ---
 
@@ -161,7 +161,7 @@ Gymnasium은 두 종료 신호를 구분한다.
 - `terminated=True`: 과제 자체의 종료 조건에 도달했다. 이 경우 일반적으로 다음 상태 가치로 부트스트랩하지 않는다.
 - `truncated=True`: 시간 제한 등 외부 조건으로 에피소드가 끊겼다. 이때는 종료 직전 상태의 가치 예측을 이용해야 하는 경우가 있다.
 
-네가 공부한 구현은 `truncated` 때 `gamma * next_value`를 보상에 더하는 처리가 있었다. 이 방식은 그 다음 GAE 계산에서 같은 다음 상태 가치를 또 반영하는지, 종료 마스크가 어떻게 만들어지는지 함께 확인해야 한다. **같은 부트스트랩 값을 보상에 더하고 TD 식에서도 중복 반영하면 목표값이 잘못될 수 있다.**
+직접 구현한 코드(`my_ppo.py`)는 `truncated` 때 `gamma * next_value`를 보상에 더하는 처리가 있었다. 이 방식은 그 다음 GAE 계산에서 같은 다음 상태 가치를 또 반영하는지, 종료 마스크가 어떻게 만들어지는지 함께 확인해야 한다. **같은 부트스트랩 값을 보상에 더하고 TD 식에서도 중복 반영하면 목표값이 잘못될 수 있다.**
 
 따라서 종료 처리 코드를 검토할 때는 다음을 확인한다.
 
@@ -211,7 +211,7 @@ PPO 업데이트에서는 보통 다음 요소를 조합한다.
 loss = policy_loss + ent_coef * entropy_loss + vf_coef * value_loss
 ```
 
-| 요소 | 무엇을 학습하는가? | 네 코드에서의 의미 |
+| 요소 | 무엇을 학습하는가? | `my_ppo.py`에서의 의미 |
 |---|---|---|
 | `policy_loss` | Actor의 정책 | PPO Clipped Surrogate Objective를 최소화 형태로 변환한 손실 |
 | `value_loss` | Critic의 가치 예측 | Return과 현재 Value 예측의 MSE |
@@ -301,28 +301,14 @@ optimizer.step()
 
 ---
 
-# 4~5강 셀프 체크
-
-1. `reward`, `value`, `returns`의 차이를 설명하라.
-2. `reward=1`, `gamma=0.9`, `next_value=4`, `value=3`, 종료되지 않았다면 TD Error는 얼마인가?
-3. Advantage가 -2라면 행동은 기대보다 어떤 결과였다는 신호인가?
-4. GAE 계산을 역순으로 하는 이유는 무엇인가?
-5. `F.mse_loss(returns, values)`에서 `returns`는 목표값인가, 예측값인가?
-6. `loss.backward()`와 `optimizer.step()`의 차이는 무엇인가?
-7. `ent_coef=0.0`이면 무엇이 달라지는가?
-8. Ratio Clipping과 Gradient Clipping은 무엇이 다른가?
-
-<details>
-<summary>정답과 해설 보기</summary>
+# 4~5강 확인한 점
 
 1. Reward는 환경이 준 즉시 보상, Value는 Critic의 상태 가치 예측, Return은 Critic을 학습할 목표값이다.
-2. `1 + 0.9 × 4 - 3 = 1.6`.
-3. 해당 행동의 결과가 기대보다 나빴다는 신호다.
-4. 현재 Advantage 계산에 이후 스텝의 누적 GAE가 필요하기 때문이다.
-5. `returns`가 목표값, `values`가 현재 Critic의 예측값이다.
-6. `backward()`는 gradient를 계산하고, `step()`은 그 gradient를 이용해 파라미터를 바꾼다.
-7. 엔트로피 항이 전체 Loss에 영향을 주지 않는다. 탐험 자체가 반드시 사라진다는 뜻은 아니다.
+2. `reward=1`, `gamma=0.9`, `next_value=4`, `value=3`이고 종료되지 않았다면 TD Error는 `1 + 0.9 × 4 - 3 = 1.6`이다.
+3. Advantage가 -2라면 해당 행동의 결과가 기대보다 나빴다는 신호다.
+4. GAE 계산을 역순으로 하는 이유는 현재 Advantage 계산에 이후 스텝의 누적 GAE가 필요하기 때문이다.
+5. `F.mse_loss(returns, values)`에서 `returns`가 목표값, `values`가 현재 Critic의 예측값이다.
+6. `loss.backward()`는 gradient를 계산하고, `optimizer.step()`은 그 gradient를 이용해 파라미터를 바꾼다.
+7. `ent_coef=0.0`이면 엔트로피 항이 전체 Loss에 영향을 주지 않는다. 탐험 자체가 반드시 사라진다는 뜻은 아니다.
 8. Ratio Clipping은 PPO 목적함수에서 Ratio의 이득을 제한하고, Gradient Clipping은 역전파 gradient의 크기를 제한한다.
-
-</details>
 

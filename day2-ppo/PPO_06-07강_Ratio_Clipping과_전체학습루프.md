@@ -67,7 +67,7 @@ ratio = torch.exp(log_prob - old_log_probs)
 
 ## 4. Clipping 범위
 
-네 설정은 다음과 같다.
+실험 설정은 다음과 같다.
 
 ```python
 clip_range = 0.2
@@ -350,48 +350,28 @@ optimizer.step()
 
 ## 구현 점검: 가장 조심해야 할 부분
 
-네가 공부한 코드에서는 `truncated`일 때 `gamma * next_value`를 보상에 더하는 처리가 있었다. 이 방식을 사용할 경우 GAE 쪽에서 같은 가치가 중복 계산되는지, 종료 마스크가 올바른지 반드시 확인한다. Rollout 수집, 마지막 가치 계산, GAE 마스크를 서로 독립된 코드 조각으로 읽으면 오류를 놓치기 쉽다.
+직접 구현한 코드에서는 `truncated`일 때 `gamma * next_value`를 보상에 더하는 처리가 있었다. 이 방식을 사용할 경우 GAE 쪽에서 같은 가치가 중복 계산되는지, 종료 마스크가 올바른지 반드시 확인한다. Rollout 수집, 마지막 가치 계산, GAE 마스크를 서로 독립된 코드 조각으로 읽으면 오류를 놓치기 쉽다.
 
 또한 `done` 하나에 `terminated or truncated`를 넣었는지, GAE가 `done`을 어떤 인덱스로 참조하는지에 따라 결과가 달라질 수 있다. 구현 전체를 확인하지 않고 종료 처리를 무작정 한 줄만 바꾸는 것은 권장하지 않는다.
 
 ---
 
-# 6~7강 셀프 체크
+# 6~7강 확인한 점
 
-1. 기존 `old_log_prob`를 저장하는 이유는 무엇인가?
-2. 기존 행동 확률이 0.4이고 현재 정책의 확률이 0.6이라면 Ratio는 얼마인가?
-3. `clip_range=0.2`, `ratio=1.6`일 때 Clipped Ratio는 얼마인가?
-4. Advantage가 양수일 때 Ratio가 지나치게 커지면 Clipped Surrogate Objective는 어떤 역할을 하는가?
-5. `policy_loss` 앞에 마이너스 부호를 붙이는 이유는 무엇인가?
-6. `value_loss`에서 `returns`와 `values`는 각각 무엇인가?
-7. `backward()` 후 `optimizer.step()`을 실행하는 이유는 무엇인가?
-8. Ratio Clipping과 Gradient Clipping의 차이는 무엇인가?
-9. 수집된 경험에 대해 같은 Rollout을 여러 epoch 학습하면 왜 현재 `log_prob`와 `old_log_prob`가 달라질 수 있는가?
-10. `truncated` 처리에서 무엇을 점검해야 하는가?
-
-<details>
-<summary>정답과 해설 보기</summary>
-
-1. 현재 정책의 로그 확률과 비교해 기존 대비 행동 확률 비율(Ratio)을 계산하기 위해서다.
-2. `0.6 / 0.4 = 1.5`.
-3. `1 + 0.2 = 1.2`로 제한된다.
-4. 그 행동의 확률이 크게 바뀌어 얻는 정책 목적함수상의 이득을 제한한다. 실제 Ratio 자체를 강제로 고정하는 것은 아니다.
-5. 원래 정책 목적함수는 최대화하지만 옵티마이저는 Loss를 최소화하므로, 목적함수에 음수를 곱해 최소화 문제로 바꾼다.
-6. `returns`는 Critic의 목표값이고, `values`는 현재 Critic 예측값이다.
+1. 기존 `old_log_prob`를 저장하는 이유는 현재 정책의 로그 확률과 비교해 기존 대비 행동 확률 비율(Ratio)을 계산하기 위해서다.
+2. 기존 행동 확률이 0.4이고 현재 정책의 확률이 0.6이라면 Ratio는 `0.6 / 0.4 = 1.5`다.
+3. `clip_range=0.2`, `ratio=1.6`일 때 Clipped Ratio는 `1 + 0.2 = 1.2`로 제한된다.
+4. Advantage가 양수일 때 Ratio가 지나치게 커지면, Clipped Surrogate Objective는 그 행동의 확률이 크게 바뀌어 얻는 정책 목적함수상의 이득을 제한한다. 실제 Ratio 자체를 강제로 고정하는 것은 아니다.
+5. `policy_loss` 앞에 마이너스 부호를 붙이는 이유: 원래 정책 목적함수는 최대화하지만 옵티마이저는 Loss를 최소화하므로, 목적함수에 음수를 곱해 최소화 문제로 바꾼다.
+6. `value_loss`에서 `returns`는 Critic의 목표값이고, `values`는 현재 Critic 예측값이다.
 7. `backward()`는 gradient를 계산하고 `optimizer.step()`은 그 gradient로 파라미터를 업데이트한다.
 8. Ratio Clipping은 PPO 목적함수에서 Ratio의 영향을 제한하고, Gradient Clipping은 gradient 크기를 제한한다.
-9. 각 업데이트가 Actor의 파라미터를 바꾸므로 이후 같은 상태·행동의 현재 로그 확률이 달라질 수 있다.
-10. `terminated`와 `truncated`의 구분, 다음 상태 가치의 부트스트랩, GAE 마스크, 보상에 미리 더한 가치가 중복 반영되는지를 확인한다.
+9. 같은 Rollout을 여러 epoch 학습하면 각 업데이트가 Actor의 파라미터를 바꾸므로, 이후 같은 상태·행동의 현재 `log_prob`가 `old_log_prob`와 달라질 수 있다.
+10. `truncated` 처리에서는 `terminated`와 `truncated`의 구분, 다음 상태 가치의 부트스트랩, GAE 마스크, 보상에 미리 더한 가치가 중복 반영되는지를 점검한다.
 
-</details>
+## 1~7강 핵심 연결 요약
 
-## 마지막 연습: 코드 없이 설명하기
-
-아래 네 문장을 자료를 보지 않고 설명해 본다.
-
-1. “PPO는 경험을 모은 다음, 그 경험으로 여러 번 정책을 업데이트한다.”
-2. “Ratio는 정책이 바뀐 정도를 행동 확률 기준으로 비교한다.”
-3. “Advantage는 행동 결과를 기대와 비교하는 신호이고, Return은 Critic의 학습 목표로 사용된다.”
-4. “`backward()`는 gradient를 계산하고 `optimizer.step()`은 파라미터를 바꾼다.”
-
-각 문장을 네 말로 설명할 수 있다면 1~7강의 핵심 연결을 이해하고 있는 것이다.
+1. PPO는 경험을 모은 다음, 그 경험으로 여러 번 정책을 업데이트한다.
+2. Ratio는 정책이 바뀐 정도를 행동 확률 기준으로 비교한다.
+3. Advantage는 행동 결과를 기대와 비교하는 신호이고, Return은 Critic의 학습 목표로 사용된다.
+4. `backward()`는 gradient를 계산하고 `optimizer.step()`은 파라미터를 바꾼다.

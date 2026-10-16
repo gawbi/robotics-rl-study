@@ -35,7 +35,7 @@ cd ~/IsaacLab
 
 ## 2. 보상 구조 요약
 
-자세한 설명: [1교시 노트 — G1은 무엇으로 점수를 받을까?](lesson01_g1_reward_structure.md)
+자세한 설명: [G1 보상 구조 분석](g1_reward_structure.md)
 
 | 그룹 | 역할 | 항목 (가중치) |
 |---|---|---|

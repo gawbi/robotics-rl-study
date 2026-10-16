@@ -89,7 +89,7 @@ joint_effort = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["slider
 - `sim.dt = 1/120`, `decimation = 2` → 정책은 1초에 60번 행동
 - `episode_length_s = 5` → 최대 **300 step**
 
-→ G1 보상 구조와 비교: [day4 1교시 노트](../day4-g1-reward-baseline/lesson01_g1_reward_structure.md)
+→ G1 보상 구조와 비교: [day4 G1 보상 구조 분석](../day4-g1-reward-baseline/g1_reward_structure.md)
 
 ---
 
@@ -242,20 +242,7 @@ elif kl_mean < self.desired_kl / 2.0 and kl_mean > 0.0:
 
 ---
 
-## 6. 내 해석 (직접 채우기)
-
-- 7번째 iteration에서 평균 보상이 −4.29까지 떨어진 이유는? (힌트: 종료 원인 그래프, `terminating`, `pole_pos`)
-  -
-- 막대가 넘어져도 에피소드가 안 끝나는데, 정책은 어떻게 막대를 세우는 법을 배웠을까?
-  -
-- 행동 노이즈 σ가 1.0에서 0.044로 줄어든 건 무슨 뜻일까?
-  -
-- Day 2(10만 step)보다 100배쯤 많은 약 980만 step을 19초 만에 처리할 수 있었던 이유는?
-  -
-
----
-
-## 7. 다시 실행하는 법
+## 6. 다시 실행하는 법
 
 ```bash
 cd ~/IsaacLab
@@ -279,7 +266,7 @@ cd ~/IsaacLab
 
 ---
 
-## 8. 아직 안 한 것
+## 7. 아직 안 한 것
 
 README에 적은 Day 3 목표는 **하이퍼파라미터 실험**인데, 지금은 기본 설정으로 1회만 학습했다.
 9강 방식(예측 → 하나만 바꾸기 → 실행 → 기록 → 해석)으로 해볼 만한 후보:
