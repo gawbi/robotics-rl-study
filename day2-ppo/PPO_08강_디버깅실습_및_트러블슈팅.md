@@ -22,7 +22,7 @@
 실습 파일의 실제 경로:
 
 ```text
-/Users/kimgwangbin/robotics-rl-study/day2-ppo/my_ppo.py
+day2-ppo/my_ppo.py
 ```
 
 터미널에서 프로젝트 루트인 `robotics-rl-study` 폴더에 있을 때 실행하는 명령어:
@@ -326,7 +326,7 @@ python day2-ppo/my_ppo.py watch --episodes 5
 **오류 예시**
 
 ```text
-python: can't open file '/Users/kimgwangbin/robotics-rl-study/my_ppo.py': [Errno 2] No such file or directory
+python: can't open file 'my_ppo.py': [Errno 2] No such file or directory
 ```
 
 **원인**: 터미널의 현재 폴더에 `my_ppo.py`가 없었다. 실제 파일은 `day2-ppo` 하위 폴더에 있었다.
